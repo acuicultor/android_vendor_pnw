@@ -1,4 +1,49 @@
-PRODUCT_BRAND ?= LineageOS
+# Copyright (C) 2017 Project New World
+#
+# Licensed under the Apache License, Version 2.0 (the "License");
+# you may not use this file except in compliance with the License.
+# You may obtain a copy of the License at
+#
+#      http://www.apache.org/licenses/LICENSE-2.0
+#
+# Unless required by applicable law or agreed to in writing, software
+# distributed under the License is distributed on an "AS IS" BASIS,
+# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
+# See the License for the specific language governing permissions and
+# limitations under the License.
+
+# PNW_BUILDTYPE belongs to the pnw.mk
+ifeq ($(PNW_BUILDTYPE), Official)
+    PNW_TAG := Official
+else ifeq ($(PNW_BUILDTYPE), Alpha)
+    PNW_TAG := Alpha
+else ifeq ($(PNW_BUILDTYPE), Beta)
+    PNW_TAG := Beta
+else ifeq ($(PNW_BUILDTYPE), Test)
+    PNW_TAG := Test
+else ifeq ($(PNW_BUILDTYPE), EOL)
+    PNW_TAG := EOL
+else
+    PNW_TAG := Unofficial
+endif
+
+# Include versioning information
+# Format: Major.minor.maintenance(-TAG)
+ROM_VERSION := 8.0.0
+export PNW_VERSION := $(ROM_VERSION)-$(PNW_TAG)
+ROM_POSTFIX := $(shell date -u +%Y%m%d)
+
+export PNW_BUILD_VERSION := Project-New-World-$(PNW_VERSION)-$(TARGET_PRODUCT)-$(ROM_POSTFIX)
+export ROM_VERSION := $(PNW_VERSION)-$(ROM_POSTFIX)
+
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.modversion=$(ROM_VERSION) \
+    ro.pnw.version=$(PNW_VERSION)
+
+# Override old AOSP default sounds with newer Google stock ones
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.config.notification_sound=Ariel.ogg \
+    ro.config.alarm_alert=Osmium.ogg
 
 PRODUCT_BUILD_PROP_OVERRIDES += BUILD_UTC_DATE=0
 
@@ -16,19 +61,12 @@ PRODUCT_PROPERTY_OVERRIDES += \
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.build.selinux=1
 
-# Default notification/alarm sounds
+ifeq ($(TARGET_BUILD_VARIANT),user)
 PRODUCT_PROPERTY_OVERRIDES += \
-    ro.config.notification_sound=Argon.ogg \
-    ro.config.alarm_alert=Hassium.ogg
-
-ifneq ($(TARGET_BUILD_VARIANT),user)
-# Thank you, please drive thru!
-PRODUCT_PROPERTY_OVERRIDES += persist.sys.dun.override=0
-endif
-
-ifneq ($(TARGET_BUILD_VARIANT),eng)
-# Enable ADB authentication
-PRODUCT_DEFAULT_PROPERTY_OVERRIDES += ro.adb.secure=1
+    ro.adb.secure=1
+else
+PRODUCT_PROPERTY_OVERRIDES += \
+    ro.adb.secure=0
 endif
 
 ifeq ($(BOARD_CACHEIMAGE_FILE_SYSTEM_TYPE),)
@@ -39,139 +77,65 @@ else
     ro.device.cache_dir=/cache
 endif
 
+# Allow tethering without provisioning app
+PRODUCT_PROPERTY_OVERRIDES += net.tethering.noprovisioning=true
+
 # Backup Tool
 PRODUCT_COPY_FILES += \
-    vendor/lineage/prebuilt/common/bin/backuptool.sh:install/bin/backuptool.sh \
-    vendor/lineage/prebuilt/common/bin/backuptool.functions:install/bin/backuptool.functions \
-    vendor/lineage/prebuilt/common/bin/50-lineage.sh:system/addon.d/50-lineage.sh \
-    vendor/lineage/prebuilt/common/bin/blacklist:system/addon.d/blacklist
+    vendor/pnw/prebuilt/bin/backuptool.sh:install/bin/backuptool.sh \
+    vendor/pnw/prebuilt/bin/backuptool.functions:install/bin/backuptool.functions \
+    vendor/pnw/prebuilt/bin/50-pnw.sh:system/addon.d/50-pnw.sh
 
 # Backup Services whitelist
-PRODUCT_COPY_FILES += \
-    vendor/lineage/config/permissions/backup.xml:system/etc/sysconfig/backup.xml
+PRODUCT_COPY_FILES += vendor/pnw/config/permissions/backup.xml:system/etc/sysconfig/backup.xml
 
-# Lineage-specific broadcast actions whitelist
-PRODUCT_COPY_FILES += \
-    vendor/lineage/config/permissions/lineage-sysconfig.xml:system/etc/sysconfig/lineage-sysconfig.xml
+# Bootanimation
+PRODUCT_COPY_FILES += vendor/pnw/prebuilt/bootanimation/placeholder.zip:system/media/bootanimation.zip
 
-# Signature compatibility validation
-PRODUCT_COPY_FILES += \
-    vendor/lineage/prebuilt/common/bin/otasigcheck.sh:install/bin/otasigcheck.sh
+# Copy PNW specific init file
+PRODUCT_COPY_FILES += vendor/pnw/prebuilt/root/init.pnw.rc:root/init.pnw.rc
+
+# Enable SIP+VoIP
+PRODUCT_COPY_FILES += frameworks/native/data/etc/android.software.sip.voip.xml:system/etc/permissions/android.software.sip.voip.xml
+
+# Include vendor overlays
+PRODUCT_PACKAGE_OVERLAYS += vendor/pnw/overlay/common
 
 # init.d support
 PRODUCT_COPY_FILES += \
-    vendor/lineage/prebuilt/common/etc/init.d/00banner:system/etc/init.d/00banner \
-    vendor/lineage/prebuilt/common/bin/sysinit:system/bin/sysinit
+    vendor/pnw/prebuilt/etc/init.d/00banner:system/etc/init.d/00banner \
+    vendor/pnw/prebuilt/etc/init.d/90userinit:system/etc/init.d/90userinit \
+    vendor/pnw/prebuilt/bin/sysinit:system/bin/sysinit
 
-ifneq ($(TARGET_BUILD_VARIANT),user)
-# userinit support
-PRODUCT_COPY_FILES += \
-    vendor/lineage/prebuilt/common/etc/init.d/90userinit:system/etc/init.d/90userinit
-endif
-
-# Copy all Lineage-specific init rc files
-$(foreach f,$(wildcard vendor/lineage/prebuilt/common/etc/init/*.rc),\
-	$(eval PRODUCT_COPY_FILES += $(f):system/etc/init/$(notdir $f)))
-
-# Copy over added mimetype supported in libcore.net.MimeUtils
-PRODUCT_COPY_FILES += \
-    vendor/lineage/prebuilt/common/lib/content-types.properties:system/lib/content-types.properties
-
-# Enable SIP+VoIP on all targets
-PRODUCT_COPY_FILES += \
-    frameworks/native/data/etc/android.software.sip.voip.xml:system/etc/permissions/android.software.sip.voip.xml
-
-# Enable wireless Xbox 360 controller support
-PRODUCT_COPY_FILES += \
-    frameworks/base/data/keyboards/Vendor_045e_Product_028e.kl:system/usr/keylayout/Vendor_045e_Product_0719.kl
-
-# This is Lineage!
-PRODUCT_COPY_FILES += \
-    vendor/lineage/config/permissions/org.lineageos.android.xml:system/etc/permissions/org.lineageos.android.xml \
-    vendor/lineage/config/permissions/privapp-permissions-lineage.xml:system/etc/permissions/privapp-permissions-lineage.xml
-
-# Include Lineage audio files
-include vendor/lineage/config/lineage_audio.mk
-
-ifneq ($(TARGET_DISABLE_LINEAGE_SDK), true)
-# Lineage SDK
-include vendor/lineage/config/lineage_sdk_common.mk
-endif
-
-# TWRP
-ifeq ($(WITH_TWRP),true)
-include vendor/lineage/config/twrp.mk
-endif
-
-# Bootanimation
-PRODUCT_PACKAGES += \
-    bootanimation.zip
-
-# Required Lineage packages
-PRODUCT_PACKAGES += \
-    BluetoothExt \
-    CMAudioService \
-    LineageParts \
-    Development \
-    Profiles \
-    WeatherManagerService
-
-# Optional packages
-PRODUCT_PACKAGES += \
-    libemoji \
-    LiveWallpapersPicker \
-    PhotoTable \
-    Terminal
+# Signature compatibility validation
+PRODUCT_COPY_FILES += vendor/pnw/prebuilt/bin/otasigcheck.sh:install/bin/otasigcheck.sh
 
 # Include explicitly to work around GMS issues
 PRODUCT_PACKAGES += \
     libprotobuf-cpp-full \
     librsjni
 
-# Custom Lineage packages
+# Packages
 PRODUCT_PACKAGES += \
     AudioFX \
-    LineageSettingsProvider \
-    LineageSetupWizard \
-    Eleven \
-    ExactCalculator \
-    Jelly \
-    LockClock \
-    Trebuchet \
-    Updater \
-    WallpaperPicker \
-    WeatherProvider
+    WallpaperPicker
 
-# Exchange support
+# Optional packages
 PRODUCT_PACKAGES += \
-    Exchange2
+    Basic \
+    LiveWallpapersPicker \
+    PhaseBeam
 
-# Extra tools in Lineage
+# Include support for additional filesystems
 PRODUCT_PACKAGES += \
-    7z \
-    bash \
-    bzip2 \
-    curl \
-    fsck.ntfs \
-    gdbserver \
-    htop \
-    lib7z \
-    libsepol \
-    micro_bench \
+    e2fsck \
     mke2fs \
-    mkfs.ntfs \
-    mount.ntfs \
-    oprofiled \
-    pigz \
-    powertop \
-    sqlite3 \
-    strace \
     tune2fs \
-    unrar \
-    unzip \
-    vim \
-    wget \
-    zip
+    mount.exfat \
+    fsck.exfat \
+    mkfs.exfat \
+    ntfsfix \
+    ntfs-3g
 
 # Custom off-mode charger
 ifneq ($(WITH_LINEAGE_CHARGER),false)
@@ -192,20 +156,6 @@ PRODUCT_PACKAGES += \
     mkfs.exfat
 endif
 
-# Openssh
-PRODUCT_PACKAGES += \
-    scp \
-    sftp \
-    ssh \
-    sshd \
-    sshd_config \
-    ssh-keygen \
-    start-ssh
-
-# rsync
-PRODUCT_PACKAGES += \
-    rsync
-
 # Stagefright FFMPEG plugin
 PRODUCT_PACKAGES += \
     libffmpeg_extractor \
@@ -219,152 +169,5 @@ PRODUCT_PROPERTY_OVERRIDES += \
 # Storage manager
 PRODUCT_PROPERTY_OVERRIDES += \
     ro.storage_manager.enabled=true
-
-# These packages are excluded from user builds
-ifneq ($(TARGET_BUILD_VARIANT),user)
-PRODUCT_PACKAGES += \
-    procmem \
-    procrank
-
-# Conditionally build in su
-ifeq ($(WITH_SU),true)
-PRODUCT_PACKAGES += \
-    su
-endif
-endif
-
-DEVICE_PACKAGE_OVERLAYS += vendor/lineage/overlay/common
-
-PRODUCT_VERSION_MAJOR = 15
-PRODUCT_VERSION_MINOR = 0
-PRODUCT_VERSION_MAINTENANCE := 0
-
-ifeq ($(TARGET_VENDOR_SHOW_MAINTENANCE_VERSION),true)
-    LINEAGE_VERSION_MAINTENANCE := $(PRODUCT_VERSION_MAINTENANCE)
-else
-    LINEAGE_VERSION_MAINTENANCE := 0
-endif
-
-# Set LINEAGE_BUILDTYPE from the env RELEASE_TYPE, for jenkins compat
-
-ifndef LINEAGE_BUILDTYPE
-    ifdef RELEASE_TYPE
-        # Starting with "LINEAGE_" is optional
-        RELEASE_TYPE := $(shell echo $(RELEASE_TYPE) | sed -e 's|^LINEAGE_||g')
-        LINEAGE_BUILDTYPE := $(RELEASE_TYPE)
-    endif
-endif
-
-# Filter out random types, so it'll reset to UNOFFICIAL
-ifeq ($(filter RELEASE NIGHTLY SNAPSHOT EXPERIMENTAL,$(LINEAGE_BUILDTYPE)),)
-    LINEAGE_BUILDTYPE :=
-endif
-
-ifdef LINEAGE_BUILDTYPE
-    ifneq ($(LINEAGE_BUILDTYPE), SNAPSHOT)
-        ifdef LINEAGE_EXTRAVERSION
-            # Force build type to EXPERIMENTAL
-            LINEAGE_BUILDTYPE := EXPERIMENTAL
-            # Remove leading dash from LINEAGE_EXTRAVERSION
-            LINEAGE_EXTRAVERSION := $(shell echo $(LINEAGE_EXTRAVERSION) | sed 's/-//')
-            # Add leading dash to LINEAGE_EXTRAVERSION
-            LINEAGE_EXTRAVERSION := -$(LINEAGE_EXTRAVERSION)
-        endif
-    else
-        ifndef LINEAGE_EXTRAVERSION
-            # Force build type to EXPERIMENTAL, SNAPSHOT mandates a tag
-            LINEAGE_BUILDTYPE := EXPERIMENTAL
-        else
-            # Remove leading dash from LINEAGE_EXTRAVERSION
-            LINEAGE_EXTRAVERSION := $(shell echo $(LINEAGE_EXTRAVERSION) | sed 's/-//')
-            # Add leading dash to LINEAGE_EXTRAVERSION
-            LINEAGE_EXTRAVERSION := -$(LINEAGE_EXTRAVERSION)
-        endif
-    endif
-else
-    # If LINEAGE_BUILDTYPE is not defined, set to UNOFFICIAL
-    LINEAGE_BUILDTYPE := UNOFFICIAL
-    LINEAGE_EXTRAVERSION :=
-endif
-
-ifeq ($(LINEAGE_BUILDTYPE), UNOFFICIAL)
-    ifneq ($(TARGET_UNOFFICIAL_BUILD_ID),)
-        LINEAGE_EXTRAVERSION := -$(TARGET_UNOFFICIAL_BUILD_ID)
-    endif
-endif
-
-ifeq ($(LINEAGE_BUILDTYPE), RELEASE)
-    ifndef TARGET_VENDOR_RELEASE_BUILD_ID
-        LINEAGE_VERSION := $(PRODUCT_VERSION_MAJOR).$(PRODUCT_VERSION_MINOR).$(PRODUCT_VERSION_MAINTENANCE)$(PRODUCT_VERSION_DEVICE_SPECIFIC)-$(LINEAGE_BUILD)
-    else
-        ifeq ($(TARGET_BUILD_VARIANT),user)
-            ifeq ($(LINEAGE_VERSION_MAINTENANCE),0)
-                LINEAGE_VERSION := $(PRODUCT_VERSION_MAJOR).$(PRODUCT_VERSION_MINOR)-$(TARGET_VENDOR_RELEASE_BUILD_ID)-$(LINEAGE_BUILD)
-            else
-                LINEAGE_VERSION := $(PRODUCT_VERSION_MAJOR).$(PRODUCT_VERSION_MINOR).$(LINEAGE_VERSION_MAINTENANCE)-$(TARGET_VENDOR_RELEASE_BUILD_ID)-$(LINEAGE_BUILD)
-            endif
-        else
-            LINEAGE_VERSION := $(PRODUCT_VERSION_MAJOR).$(PRODUCT_VERSION_MINOR).$(PRODUCT_VERSION_MAINTENANCE)$(PRODUCT_VERSION_DEVICE_SPECIFIC)-$(LINEAGE_BUILD)
-        endif
-    endif
-else
-    ifeq ($(LINEAGE_VERSION_MAINTENANCE),0)
-        ifeq ($(LINEAGE_BUILDTYPE), UNOFFICIAL)
-            LINEAGE_VERSION := $(PRODUCT_VERSION_MAJOR).$(PRODUCT_VERSION_MINOR)-$(shell date -u +%Y%m%d_%H%M%S)-$(LINEAGE_BUILDTYPE)$(LINEAGE_EXTRAVERSION)-$(LINEAGE_BUILD)
-        else
-            LINEAGE_VERSION := $(PRODUCT_VERSION_MAJOR).$(PRODUCT_VERSION_MINOR)-$(shell date -u +%Y%m%d)-$(LINEAGE_BUILDTYPE)$(LINEAGE_EXTRAVERSION)-$(LINEAGE_BUILD)
-        endif
-    else
-        ifeq ($(LINEAGE_BUILDTYPE), UNOFFICIAL)
-            LINEAGE_VERSION := $(PRODUCT_VERSION_MAJOR).$(PRODUCT_VERSION_MINOR).$(LINEAGE_VERSION_MAINTENANCE)-$(shell date -u +%Y%m%d_%H%M%S)-$(LINEAGE_BUILDTYPE)$(LINEAGE_EXTRAVERSION)-$(LINEAGE_BUILD)
-        else
-            LINEAGE_VERSION := $(PRODUCT_VERSION_MAJOR).$(PRODUCT_VERSION_MINOR).$(LINEAGE_VERSION_MAINTENANCE)-$(shell date -u +%Y%m%d)-$(LINEAGE_BUILDTYPE)$(LINEAGE_EXTRAVERSION)-$(LINEAGE_BUILD)
-        endif
-    endif
-endif
-
-PRODUCT_PROPERTY_OVERRIDES += \
-    ro.lineage.version=$(LINEAGE_VERSION) \
-    ro.lineage.releasetype=$(LINEAGE_BUILDTYPE) \
-    ro.lineage.build.version=$(PRODUCT_VERSION_MAJOR).$(PRODUCT_VERSION_MINOR) \
-    ro.modversion=$(LINEAGE_VERSION) \
-    ro.lineagelegal.url=https://lineageos.org/legal
-
-PRODUCT_EXTRA_RECOVERY_KEYS += \
-    vendor/lineage/build/target/product/security/lineage
-
--include vendor/lineage-priv/keys/keys.mk
-
-LINEAGE_DISPLAY_VERSION := $(LINEAGE_VERSION)
-
-ifneq ($(PRODUCT_DEFAULT_DEV_CERTIFICATE),)
-ifneq ($(PRODUCT_DEFAULT_DEV_CERTIFICATE),build/target/product/security/testkey)
-    ifneq ($(LINEAGE_BUILDTYPE), UNOFFICIAL)
-        ifndef TARGET_VENDOR_RELEASE_BUILD_ID
-            ifneq ($(LINEAGE_EXTRAVERSION),)
-                # Remove leading dash from LINEAGE_EXTRAVERSION
-                LINEAGE_EXTRAVERSION := $(shell echo $(LINEAGE_EXTRAVERSION) | sed 's/-//')
-                TARGET_VENDOR_RELEASE_BUILD_ID := $(LINEAGE_EXTRAVERSION)
-            else
-                TARGET_VENDOR_RELEASE_BUILD_ID := $(shell date -u +%Y%m%d)
-            endif
-        else
-            TARGET_VENDOR_RELEASE_BUILD_ID := $(TARGET_VENDOR_RELEASE_BUILD_ID)
-        endif
-        ifeq ($(LINEAGE_VERSION_MAINTENANCE),0)
-            LINEAGE_DISPLAY_VERSION := $(PRODUCT_VERSION_MAJOR).$(PRODUCT_VERSION_MINOR)-$(TARGET_VENDOR_RELEASE_BUILD_ID)-$(LINEAGE_BUILD)
-        else
-            LINEAGE_DISPLAY_VERSION := $(PRODUCT_VERSION_MAJOR).$(PRODUCT_VERSION_MINOR).$(LINEAGE_VERSION_MAINTENANCE)-$(TARGET_VENDOR_RELEASE_BUILD_ID)-$(LINEAGE_BUILD)
-        endif
-    endif
-endif
-endif
-
-PRODUCT_PROPERTY_OVERRIDES += \
-    ro.lineage.display.version=$(LINEAGE_DISPLAY_VERSION)
-
--include $(WORKSPACE)/build_env/image-auto-bits.mk
--include vendor/lineage/config/partner_gms.mk
--include vendor/cyngn/product.mk
 
 $(call prepend-product-if-exists, vendor/extra/product.mk)

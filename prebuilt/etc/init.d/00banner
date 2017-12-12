@@ -1,0 +1,7 @@
+#!/system/bin/sh
+#
+# Print startup info
+#
+L="log -p i -t pnw"
+
+$L "Welcome to Android `getprop ro.build.version.release` / Project-New-World-`getprop ro.pnw.version`";
