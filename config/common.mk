@@ -126,6 +126,10 @@ PRODUCT_PACKAGES += \
     LiveWallpapersPicker \
     PhaseBeam
 
+# ProjectNewWorld packages
+PRODUCT_PACKAGES += \
+    Eleven
+
 # Include support for additional filesystems
 PRODUCT_PACKAGES += \
     e2fsck \
