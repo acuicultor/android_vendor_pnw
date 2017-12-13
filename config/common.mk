@@ -29,8 +29,8 @@ endif
 
 # Include versioning information
 # Format: Major.minor.maintenance(-TAG)
-ROM_VERSION := 8.0.0
-export PNW_VERSION := $(ROM_VERSION)-$(PNW_TAG)
+PNW_VERSION_TAG := 8.0.0
+export PNW_VERSION := $(PNW_VERSION_TAG)-$(PNW_TAG)
 ROM_POSTFIX := $(shell date -u +%Y%m%d)
 
 export PNW_BUILD_VERSION := Project-New-World-$(PNW_VERSION)-$(TARGET_PRODUCT)-$(ROM_POSTFIX)
