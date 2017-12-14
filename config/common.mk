@@ -123,8 +123,7 @@ PRODUCT_PACKAGES += \
 # Optional packages
 PRODUCT_PACKAGES += \
     Basic \
-    LiveWallpapersPicker \
-    PhaseBeam
+    LiveWallpapersPicker
 
 # ProjectNewWorld packages
 PRODUCT_PACKAGES += \
