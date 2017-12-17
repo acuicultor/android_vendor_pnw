@@ -89,8 +89,14 @@ PRODUCT_COPY_FILES += \
 # Backup Services whitelist
 PRODUCT_COPY_FILES += vendor/pnw/config/permissions/backup.xml:system/etc/sysconfig/backup.xml
 
-# Bootanimation
-PRODUCT_COPY_FILES += vendor/pnw/prebuilt/bootanimation/placeholder.zip:system/media/bootanimation.zip
+# Include our custom PNW bootanimation
+ifeq ($(TARGET_BOOT_ANIMATION_RES),720)
+     PRODUCT_COPY_FILES += vendor/pnw/prebuilt/bootanimation/720.zip:system/media/bootanimation.zip
+else ifeq ($(TARGET_BOOT_ANIMATION_RES),1080)
+     PRODUCT_COPY_FILES += vendor/pnw/prebuilt/bootanimation/1080.zip:system/media/bootanimation.zip
+else ifeq ($(TARGET_BOOT_ANIMATION_RES), 1440)
+     PRODUCT_COPY_FILES += vendor/pnw/prebuilt/bootanimation/1440.zip:system/media/bootanimation.zip
+endif
 
 # Copy PNW specific init file
 PRODUCT_COPY_FILES += vendor/pnw/prebuilt/root/init.pnw.rc:root/init.pnw.rc
